@@ -1,5 +1,5 @@
 // Main App component with routing setup
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -7,17 +7,17 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
-import Home from './pages/Home';
-import Login from './pages/Auth/Login';
-import Signup from './pages/Auth/Signup';
-import Leaderboard from './pages/Leaderboard';
-import Profile from './pages/Profile';
-import MakeQuiz from './pages/MakeQuiz';
-import HotTopics from './pages/HotTopics';
-import QuestionOfDay from './pages/QuestionOfDay';
-import PastSets from './pages/PastSets';
-import QMDataset from './pages/QMDataset';
-import Performance from './pages/Performance';
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Auth/Login'));
+const Signup = lazy(() => import('./pages/Auth/Signup'));
+const Leaderboard = lazy(() => import('./pages/Leaderboard'));
+const Profile = lazy(() => import('./pages/Profile'));
+const MakeQuiz = lazy(() => import('./pages/MakeQuiz'));
+const HotTopics = lazy(() => import('./pages/HotTopics'));
+const QuestionOfDay = lazy(() => import('./pages/QuestionOfDay'));
+const PastSets = lazy(() => import('./pages/PastSets'));
+const QMDataset = lazy(() => import('./pages/QMDataset'));
+const Performance = lazy(() => import('./pages/Performance'));
 
 function App() {
   return (
