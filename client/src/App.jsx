@@ -31,7 +31,12 @@ function App() {
                 {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
-
+                {/*
+                </Routes>A 404 "Not Found" Route: Adding a catch-all route at the 
+                bottom of your <Routes> ensures that if a user navigates to a URL 
+                that doesn't exist, they are met with a friendly "Not Found" message 
+                rather than a blank screen.
+                */}
                 {/* Protected Routes */}
                 <Route element={<ProtectedRoute />}>
                   <Route path="/" element={<Home />} />
