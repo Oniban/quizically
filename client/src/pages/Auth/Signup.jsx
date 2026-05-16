@@ -45,7 +45,7 @@ const Signup = () => {
                     <input
                         type="text"
                         {...register('name', { required: 'Name is required' })}
-                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full p-2 border rounded-lg text-white dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="John Doe"
                     />
                     {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
@@ -62,7 +62,7 @@ const Signup = () => {
                                 message: 'Invalid email address'
                             }
                         })}
-                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full p-2 border rounded-lg text-white dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="john@example.com"
                     />
                     {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
@@ -76,7 +76,7 @@ const Signup = () => {
                             required: 'Password is required',
                             minLength: { value: 6, message: 'Password must be at least 6 characters' }
                         })}
-                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full p-2 border rounded-lg text-white dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="••••••••"
                     />
                     {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
@@ -90,7 +90,7 @@ const Signup = () => {
                             required: 'Please confirm your password',
                             validate: value => value === password || 'Passwords do not match'
                         })}
-                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full p-2 border rounded-lg text-white dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="••••••••"
                     />
                     {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword.message}</p>}

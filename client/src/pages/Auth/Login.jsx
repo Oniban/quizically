@@ -42,7 +42,7 @@ const Login = () => {
                     <input
                         type="email"
                         {...register('email', { required: 'Email is required' })}
-                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full p-2 border rounded-lg text-white dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="john@example.com"
                     />
                     {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
@@ -53,7 +53,7 @@ const Login = () => {
                     <input
                         type="password"
                         {...register('password', { required: 'Password is required' })}
-                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full p-2 border rounded-lg text-white dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
                         placeholder="••••••••"
                     />
                     {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
