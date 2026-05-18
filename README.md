@@ -70,7 +70,7 @@ A feature-rich, full-stack quiz application designed for serious trivia enthusia
    cd client
    npm install
    # Create a .env file:
-   GOOGLE_CLIENT_ID = your_google_client_id
+   VITE_GOOGLE_CLIENT_ID = your_google_client_id
    npm run dev
    ```
 
