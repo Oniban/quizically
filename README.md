@@ -35,7 +35,6 @@ A feature-rich, full-stack quiz application designed for serious trivia enthusia
 - **Frontend:** React 18, Vite, Tailwind CSS, Lucide Icons, Recharts.
 - **Backend:** Node.js, Express.js.
 - **Database:** MongoDB via Mongoose.
-- **AI Integration:** Claude API (planned) for question explanations.
 - **State Management:** Context API for Themes and Authentication.
 
 ---
@@ -61,14 +60,17 @@ A feature-rich, full-stack quiz application designed for serious trivia enthusia
    PORT=5000
    MONGO_URI=your_mongodb_uri
    JWT_SECRET=your_random_secret_string
-   CLAUDE_API_KEY=your_api_key
-   npm start
+   NODE_ENV = development
+   GOOGLE_CLIENT_ID = your_google_client_id
+   npm run dev
    ```
 
 3. **Client Configuration:**
    ```bash
    cd client
    npm install
+   # Create a .env file:
+   GOOGLE_CLIENT_ID = your_google_client_id
    npm run dev
    ```
 
