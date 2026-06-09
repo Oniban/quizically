@@ -3,11 +3,8 @@ import axios from 'axios';
 
 const API_URL = '/api/auth';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const authHeader = (token) => ({
-  headers: { Authorization: `Bearer ${token}` },
-});
+// Configure axios to include credentials (cookies) in all requests
+axios.defaults.withCredentials = true;
 
 // ─── Email / Password ─────────────────────────────────────────────────────────
 
@@ -35,10 +32,10 @@ export const googleLogin = async (credential) => {
 // ─── Session Validation ───────────────────────────────────────────────────────
 
 /**
- * Validate the stored JWT and return fresh user data.
- * Called on app mount to check whether the saved token is still valid.
+ * Validate the stored JWT cookie and return fresh user data.
+ * Called on app mount to check whether the session is still valid.
  */
-export const getMe = async (token) => {
-  const response = await axios.get(`${API_URL}/me`, authHeader(token));
+export const getMe = async () => {
+  const response = await axios.get(`${API_URL}/me`);
   return response.data;
 };

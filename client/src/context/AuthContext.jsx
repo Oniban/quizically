@@ -8,23 +8,16 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // On mount, validate the stored token by calling /api/auth/me
+  // On mount, validate the session by calling /api/auth/me
+  // The cookie is automatically sent by axios (withCredentials: true)
   useEffect(() => {
     const validateSession = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
       try {
-        const data = await getMe(token);
+        const data = await getMe();
         // Rehydrate user from server (fresh, authoritative data)
-        setUser({ ...data.user, token });
+        setUser(data.user);
       } catch {
-        // Token invalid/expired — clear storage
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        // No valid session (cookie expired or missing)
         setUser(null);
       } finally {
         setLoading(false);
@@ -35,16 +28,15 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = useCallback((userData) => {
+    // Cookie is set automatically by the server on login/register
+    // Just update the client state
     setUser(userData);
-    localStorage.setItem('token', userData.token);
-    // Store a minimal user object (token is already in its own key)
-    localStorage.setItem('user', JSON.stringify(userData));
   }, []);
 
   const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    // Optionally: call a server endpoint to clear the cookie
+    // For now, the cookie will expire naturally (30 days)
   }, []);
 
   return (

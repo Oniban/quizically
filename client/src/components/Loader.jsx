@@ -1,16 +1,20 @@
-// Loading spinner component
+// Loading spinner component with sprite animation
 import React from 'react';
+import '../styles/loader.css'; // New CSS file for sprite animation
 
 const Loader = ({ size = 'md' }) => {
   const sizes = {
-    sm: 'h-4 w-4 border-2',
-    md: 'h-8 w-8 border-3',
-    lg: 'h-12 w-12 border-4',
+    sm: { width: '68px', height: '49px' },
+    md: { width: '272px', height: '197px' },
+    lg: { width: '408px', height: '295px' },
   };
 
   return (
-    <div className="flex justify-center items-center py-10">
-      <div className={`${sizes[size]} animate-spin rounded-full border-indigo-600 border-t-transparent`}></div>
+    <div className="flex items-center justify-center py-10">
+      <div 
+        className="loader-sprite"
+        style={sizes[size]}
+      ></div>
     </div>
   );
 };

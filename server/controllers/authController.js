@@ -11,6 +11,17 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
+const setAuthCookie = (res, token) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: isProduction, // Only HTTPS in production
+    sameSite: 'strict',
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in milliseconds
+    path: '/',
+  });
+};
+
 const sanitizeUser = (user) => ({
   _id: user._id,
   name: user.name,
@@ -69,9 +80,11 @@ export const register = async (req, res, next) => {
       authProvider: 'local',
     });
 
+    const token = generateToken(user._id);
+    setAuthCookie(res, token);
+
     res.status(201).json({
       user: sanitizeUser(user),
-      token: generateToken(user._id),
     });
   } catch (error) {
     next(error);
@@ -134,9 +147,11 @@ export const login = async (req, res, next) => {
     updateStreak(user);
     await user.save();
 
+    const token = generateToken(user._id);
+    setAuthCookie(res, token);
+
     res.json({
       user: sanitizeUser(user),
-      token: generateToken(user._id),
     });
   } catch (error) {
     next(error);
@@ -202,9 +217,11 @@ export const googleAuth = async (req, res, next) => {
     updateStreak(user);
     await user.save();
 
+    const token = generateToken(user._id);
+    setAuthCookie(res, token);
+
     res.json({
       user: sanitizeUser(user),
-      token: generateToken(user._id),
     });
   } catch (error) {
     next(error);

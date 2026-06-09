@@ -3,6 +3,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
@@ -20,6 +22,7 @@ const app = express();
 
 // Set secure HTTP headers
 app.use(helmet());
+app.use(compression());
 
 // CORS — restrict to your frontend origin in production
 const allowedOrigins = process.env.CLIENT_URL
@@ -42,6 +45,7 @@ app.use(
 
 // Body parser
 app.use(express.json({ limit: '10kb' })); // Limit body size
+app.use(cookieParser()); // Parse cookies
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 

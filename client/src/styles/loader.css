@@ -1,0 +1,27 @@
+.loader-sprite {
+  background-image: url('/sprites/buffer_icon.png');
+  background-repeat: no-repeat;
+  background-size: 1088px 788px;
+  display: inline-block;
+  animation: spriteAnimation 1.6s steps(16) infinite;
+}
+
+/* 4x4 grid animation (16 frames total) */
+@keyframes spriteAnimation {
+  0% { background-position: 0 0; }
+  6.25% { background-position: -272px 0; }
+  12.5% { background-position: -544px 0; }
+  18.75% { background-position: -816px 0; }
+  25% { background-position: 0 -197px; }
+  31.25% { background-position: -272px -197px; }
+  37.5% { background-position: -544px -197px; }
+  43.75% { background-position: -816px -197px; }
+  50% { background-position: 0 -394px; }
+  56.25% { background-position: -272px -394px; }
+  62.5% { background-position: -544px -394px; }
+  68.75% { background-position: -816px -394px; }
+  75% { background-position: 0 -591px; }
+  81.25% { background-position: -272px -591px; }
+  87.5% { background-position: -544px -591px; }
+  93.75% { background-position: -816px -591px; }
+}

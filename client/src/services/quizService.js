@@ -3,13 +3,10 @@ import axios from 'axios';
 
 const API_URL = '/api/quizzes';
 
+// Configure axios to include credentials (cookies) in all requests
+axios.defaults.withCredentials = true;
+
 export const getRecentQuiz = async () => {
-  const token = localStorage.getItem('token');
-  const config = {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  };
-  const response = await axios.get(`${API_URL}/recent`, config);
+  const response = await axios.get(`${API_URL}/recent`);
   return response.data;
 };
