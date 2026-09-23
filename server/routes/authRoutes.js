@@ -1,7 +1,7 @@
 // Routes for authentication
 import express from 'express';
 import { body } from 'express-validator';
-import { register, login, googleAuth, getMe } from '../controllers/authController.js';
+import { register, login, googleAuth, getMe, logout } from '../controllers/authController.js';
 import protect from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -45,6 +45,7 @@ const loginRules = [
 router.post('/register', registerRules, register);
 router.post('/login', loginRules, login);
 router.post('/google', googleAuth);
+router.post('/logout', logout);
 router.get('/me', protect, getMe);
 
 export default router;

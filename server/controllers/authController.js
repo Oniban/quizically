@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import { validationResult } from 'express-validator';
 import { OAuth2Client } from 'google-auth-library';
+import { getActivityStats } from '../services/quizStats.js';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -11,43 +12,32 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
+const authCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  path: '/',
+});
+
 const setAuthCookie = (res, token) => {
-  const isProduction = process.env.NODE_ENV === 'production';
   res.cookie('token', token, {
-    httpOnly: true,
-    secure: isProduction, // Only HTTPS in production
-    sameSite: 'strict',
+    ...authCookieOptions(),
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in milliseconds
-    path: '/',
   });
 };
 
-const sanitizeUser = (user) => ({
-  _id: user._id,
-  name: user.name,
-  email: user.email,
-  streak: user.streak,
-  profilePic: user.profilePic,
-  authProvider: user.authProvider,
-});
-
-const updateStreak = (user) => {
-  const now = new Date();
-  const lastLogin = user.lastLoginDate;
-
-  if (!lastLogin) {
-    user.streak = 1;
-  } else {
-    const today = new Date(now).setHours(0, 0, 0, 0);
-    const last = new Date(lastLogin).setHours(0, 0, 0, 0);
-    const diffDays = (today - last) / (1000 * 60 * 60 * 24);
-
-    if (diffDays === 1) user.streak += 1;
-    else if (diffDays > 1) user.streak = 1;
-    // diffDays === 0 → same day, keep streak
-  }
-
-  user.lastLoginDate = now;
+const sanitizeUser = async (user) => {
+  const { streak, totalQuizzes } = await getActivityStats(user._id);
+  return {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    bio: user.bio,
+    streak,
+    totalQuizzes,
+    profilePic: user.profilePic,
+    authProvider: user.authProvider,
+  };
 };
 
 // ─── Register ─────────────────────────────────────────────────────────────────
@@ -75,16 +65,16 @@ export const register = async (req, res, next) => {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      streak: 1,
       lastLoginDate: new Date(),
       authProvider: 'local',
     });
 
+    const safeUser = await sanitizeUser(user);
     const token = generateToken(user._id);
     setAuthCookie(res, token);
 
     res.status(201).json({
-      user: sanitizeUser(user),
+      user: safeUser,
     });
   } catch (error) {
     next(error);
@@ -116,7 +106,7 @@ export const login = async (req, res, next) => {
     }
 
     // OAuth-only account (no password set)
-    if (user.authProvider !== 'local' || !user.password) {
+    if (!user.password) {
       return res.status(400).json({
         message: `This account was created with ${user.authProvider}. Please sign in with ${user.authProvider}.`,
       });
@@ -142,16 +132,17 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ message: msg });
     }
 
-    // Successful login — reset lockout, update streak
+    // Successful login updates access time, not quiz activity.
     await user.resetLoginAttempts();
-    updateStreak(user);
+    user.lastLoginDate = new Date();
     await user.save();
 
+    const safeUser = await sanitizeUser(user);
     const token = generateToken(user._id);
     setAuthCookie(res, token);
 
     res.json({
-      user: sanitizeUser(user),
+      user: safeUser,
     });
   } catch (error) {
     next(error);
@@ -165,6 +156,10 @@ export const login = async (req, res, next) => {
 // @access  Public
 export const googleAuth = async (req, res, next) => {
   try {
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(503).json({ message: 'Google sign-in is not configured' });
+    }
+
     const { credential } = req.body;
 
     if (!credential) {
@@ -183,23 +178,20 @@ export const googleAuth = async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid Google credential' });
     }
 
-    const { sub: googleId, email, name, picture } = payload;
+    const { sub: googleId, email, email_verified, name, picture } = payload || {};
 
-    if (!email) {
-      return res.status(400).json({ message: 'Google account must have an email' });
+    if (!googleId || !email || email_verified !== true) {
+      return res.status(401).json({ message: 'Google account must have a verified email' });
     }
 
-    // Find by googleId first, then by email
+    // Never link an unverified password account just because its email matches.
     let user = await User.findOne({ googleId });
 
     if (!user) {
       user = await User.findOne({ email: email.toLowerCase() });
 
       if (user) {
-        // Existing local account → link Google to it
-        user.googleId = googleId;
-        user.authProvider = 'google';
-        if (!user.profilePic && picture) user.profilePic = picture;
+        return res.status(409).json({ message: 'An account with this email already exists. Use its original sign-in method. Automatic account linking is not supported.' });
       } else {
         // Brand new user
         user = new User({
@@ -208,20 +200,20 @@ export const googleAuth = async (req, res, next) => {
           googleId,
           authProvider: 'google',
           profilePic: picture || '',
-          streak: 1,
           lastLoginDate: new Date(),
         });
       }
     }
 
-    updateStreak(user);
+    user.lastLoginDate = new Date();
     await user.save();
 
+    const safeUser = await sanitizeUser(user);
     const token = generateToken(user._id);
     setAuthCookie(res, token);
 
     res.json({
-      user: sanitizeUser(user),
+      user: safeUser,
     });
   } catch (error) {
     next(error);
@@ -237,10 +229,16 @@ export const getMe = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(401).json({ message: 'Not authorized, user not found' });
     }
-    res.json({ user: sanitizeUser(user) });
+    res.json({ user: await sanitizeUser(user) });
   } catch (error) {
     next(error);
   }
+};
+
+// Clearing an expired or missing session is also a successful logout.
+export const logout = (req, res) => {
+  res.clearCookie('token', authCookieOptions());
+  res.status(204).end();
 };

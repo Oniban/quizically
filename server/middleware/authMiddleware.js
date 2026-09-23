@@ -14,10 +14,25 @@ const protect = async (req, res, next) => {
     return res.status(401).json({ message: 'Not authorized, no token' });
   }
 
-  try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  if (!process.env.JWT_SECRET) {
+    return next(new Error('Authentication is not configured'));
+  }
 
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError || error instanceof jwt.NotBeforeError) {
+      return res.status(401).json({ message: 'Not authorized, invalid token' });
+    }
+    return next(error);
+  }
+
+  if (!decoded || typeof decoded.id !== 'string' || !/^[a-f\d]{24}$/i.test(decoded.id)) {
+    return res.status(401).json({ message: 'Not authorized, invalid token' });
+  }
+
+  try {
     // Get user from the token
     req.user = await User.findById(decoded.id).select('-password');
 
@@ -27,8 +42,7 @@ const protect = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error(error);
-    res.status(401).json({ message: 'Not authorized' });
+    next(error);
   }
 };
 

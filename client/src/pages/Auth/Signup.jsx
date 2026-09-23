@@ -1,9 +1,9 @@
 // Signup page component
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useEffectEvent } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
-import { registerUser, googleLogin } from '../../services/authService';
+import { registerUser, googleLogin, safeReturnTo } from '../../services/authService';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -48,23 +48,26 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = safeReturnTo(location.state?.from);
 
   const password = watch('password', '');
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) navigate('/');
-  }, [user, navigate]);
+    if (user) navigate(returnTo, { replace: true });
+  }, [user, navigate, returnTo]);
 
   // ── Google One Tap / GSI button init ──────────────────────────────────────
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
+    let active = true;
 
     const initGoogle = () => {
-      if (!window.google) return;
+      if (!active || !window.google) return;
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
-        callback: handleGoogleCredential,
+        callback: (response) => { if (active) handleGoogleCredential(response); },
       });
       window.google.accounts.id.renderButton(
         document.getElementById('google-signup-btn'),
@@ -72,32 +75,39 @@ const Signup = () => {
       );
     };
 
-    if (!document.getElementById('google-gsi-script')) {
-      const script = document.createElement('script');
+    let script = document.getElementById('google-gsi-script');
+    const onError = () => setServerError('Google sign-up could not load. You can still sign up with email.');
+    if (!script) {
+      script = document.createElement('script');
       script.id = 'google-gsi-script';
       script.src = 'https://accounts.google.com/gsi/client';
       script.async = true;
       script.defer = true;
-      script.onload = initGoogle;
       document.body.appendChild(script);
-    } else {
-      initGoogle();
     }
+    script.addEventListener('load', initGoogle);
+    script.addEventListener('error', onError);
+    initGoogle();
+    return () => {
+      active = false;
+      script.removeEventListener('load', initGoogle);
+      script.removeEventListener('error', onError);
+    };
   }, []);
 
-  const handleGoogleCredential = async ({ credential }) => {
+  const handleGoogleCredential = useEffectEvent(async ({ credential }) => {
+    if (loading) return;
     setLoading(true);
     setServerError('');
     try {
       const data = await googleLogin(credential);
-      login({ ...data.user, token: data.token });
-      navigate('/');
+      login(data.user);
     } catch (err) {
       setServerError(err.response?.data?.message || 'Google sign-up failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  });
 
   // ── Email / Password submit ───────────────────────────────────────────────
   const onSubmit = async (data) => {
@@ -106,8 +116,7 @@ const Signup = () => {
     try {
       const { confirmPassword, ...registerData } = data;
       const response = await registerUser(registerData);
-      login({ ...response.user, token: response.token });
-      navigate('/');
+      login(response.user);
     } catch (error) {
       setServerError(error.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
@@ -256,7 +265,7 @@ const Signup = () => {
 
       <p className="mt-4 text-center text-gray-500 dark:text-gray-400 text-sm">
         Already have an account?{' '}
-        <Link to="/login" className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+        <Link to="/login" state={{ from: returnTo }} className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
           Sign in here
         </Link>
       </p>

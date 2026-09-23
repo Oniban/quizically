@@ -1,46 +1,61 @@
 // Context for authentication state management
-import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { getMe } from '../services/authService';
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
+import { getMe, logoutUser } from '../services/authService';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+  const requestVersion = useRef(0);
 
-  // On mount, validate the session by calling /api/auth/me
-  // The cookie is automatically sent by axios (withCredentials: true)
-  useEffect(() => {
-    const validateSession = async () => {
-      try {
-        const data = await getMe();
-        // Rehydrate user from server (fresh, authoritative data)
+  const refreshUser = useCallback(async () => {
+    const version = ++requestVersion.current;
+    try {
+      const data = await getMe();
+      if (version === requestVersion.current) {
         setUser(data.user);
-      } catch {
-        // No valid session (cookie expired or missing)
-        setUser(null);
-      } finally {
-        setLoading(false);
+        setAuthError(null);
       }
-    };
-
-    validateSession();
+      return data.user;
+    } catch (error) {
+      if (version === requestVersion.current) {
+        if (error.response?.status === 401) {
+          setUser(null);
+          setAuthError(null);
+        } else {
+          setAuthError('We could not check your session. Check your connection and try again.');
+        }
+      }
+      throw error;
+    } finally {
+      if (version === requestVersion.current) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    refreshUser().catch(() => {});
+    return () => { requestVersion.current += 1; };
+  }, [refreshUser]);
 
   const login = useCallback((userData) => {
-    // Cookie is set automatically by the server on login/register
-    // Just update the client state
+    requestVersion.current += 1;
     setUser(userData);
+    setAuthError(null);
+    setLoading(false);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await logoutUser();
+    requestVersion.current += 1;
     setUser(null);
-    // Optionally: call a server endpoint to clear the cookie
-    // For now, the cookie will expire naturally (30 days)
+    setAuthError(null);
+    setLoading(false);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, authError, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

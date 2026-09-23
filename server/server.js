@@ -1,95 +1,17 @@
-// Main server entry point
-import express from 'express';
-import dotenv from 'dotenv';
-import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
-import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
+import 'dotenv/config';
+import { createApp } from './app.js';
 import connectDB from './config/db.js';
-import authRoutes from './routes/authRoutes.js';
-import quizRoutes from './routes/quizRoutes.js';
-import globalErrorHandler from './middleware/errorHandler.js';
+import Attempt from './models/Attempt.js';
 
-dotenv.config();
+if (!process.env.MONGO_URI || !process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error('Set MONGO_URI and a JWT_SECRET of at least 32 characters before starting the server.');
+}
+if (process.env.NODE_ENV === 'production' && !process.env.CLIENT_URL) {
+  throw new Error('Set CLIENT_URL to the frontend origin in production.');
+}
 
-// Connect to Database
-connectDB();
-
-const app = express();
-
-// ─── Security Middleware ──────────────────────────────────────────────────────
-
-// Set secure HTTP headers
-app.use(helmet());
-app.use(compression());
-
-// CORS — restrict to your frontend origin in production
-const allowedOrigins = process.env.CLIENT_URL
-  ? [process.env.CLIENT_URL]
-  : ['http://localhost:5173', 'http://localhost:3000'];
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl in dev)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  })
-);
-
-// Body parser
-app.use(express.json({ limit: '10kb' })); // Limit body size
-app.use(cookieParser()); // Parse cookies
-
-// ─── Rate Limiting ────────────────────────────────────────────────────────────
-
-// Global limiter
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: 'Too many requests, please try again later.' },
-});
-
-// Stricter limiter for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: 'Too many authentication attempts, please try again later.' },
-  skipSuccessfulRequests: true, // Don't count successful logins
-});
-
-app.use(globalLimiter);
-
-// ─── Routes ──────────────────────────────────────────────────────────────────
-
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/quizzes', quizRoutes);
-app.use('/api/users', (req, res) => res.json({ message: 'User route placeholder' }));
-app.use('/api/leaderboard', (req, res) => res.json({ message: 'Leaderboard route placeholder' }));
-app.use('/api/qm', (req, res) => res.json({ message: 'QM route placeholder' }));
-app.use('/api/question-of-day', (req, res) => res.json({ message: 'Question of Day route placeholder' }));
-
-// Root route
-app.get('/', (req, res) => {
-  res.send('Quizically API is running...');
-});
-
-// ─── Error Handler ────────────────────────────────────────────────────────────
-
-app.use(globalErrorHandler);
-
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-});
+await connectDB();
+// The uniqueness constraint must exist before the API accepts submissions.
+await Attempt.init();
+const port = process.env.PORT || 5000;
+createApp().listen(port, () => console.log(`Quizzically API listening on port ${port}`));

@@ -39,3 +39,16 @@ export const getMe = async () => {
   const response = await axios.get(`${API_URL}/me`);
   return response.data;
 };
+
+export const logoutUser = async () => {
+  await axios.post(`${API_URL}/logout`);
+};
+
+// Only allow app-local destinations, never protocol-relative or external URLs.
+export const safeReturnTo = (from) => {
+  if (typeof from !== 'string' || !from.startsWith('/') || /^\/[\\/]/.test(from) || /[\\\s]/.test(from)) {
+    return '/';
+  }
+  const path = from.split(/[?#]/)[0].replace(/\/+$/, '').toLowerCase();
+  return path === '/login' || path === '/signup' ? '/' : from;
+};

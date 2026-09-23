@@ -39,5 +39,7 @@ const quizSchema = new mongoose.Schema({
   },
 });
 
+quizSchema.index({ createdAt: -1, _id: -1 });
+
 const Quiz = mongoose.model('Quiz', quizSchema);
 export default Quiz;
