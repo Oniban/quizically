@@ -89,13 +89,19 @@ describe('quiz API with an isolated MongoDB and real HTTP server', { concurrency
     await mongoose.connect(mongo.getUri(), { serverSelectionTimeoutMS: 10000 });
     // Keep the real unique indexes: duplicate-submission safety depends on them.
     await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
-    server = createApp().listen(0, '127.0.0.1');
-    await once(server, 'listening');
-    baseURL = `http://127.0.0.1:${server.address().port}`;
   }, { timeout: 300000 });
 
   beforeEach(async () => {
+    // Fresh app instances isolate rate-limit buckets as well as database state.
+    if (server) {
+      const closed = new Promise((resolve) => server.close(resolve));
+      server.closeAllConnections();
+      await closed;
+    }
     await Promise.all(Object.values(mongoose.models).map((model) => model.deleteMany({})));
+    server = createApp().listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    baseURL = `http://127.0.0.1:${server.address().port}`;
   });
 
   after(async () => {
@@ -274,6 +280,35 @@ describe('quiz API with an isolated MongoDB and real HTTP server', { concurrency
       await assert.rejects(User.create({ name: 'Long Player', email: 'direct@example.com', password: candidate }), /72 UTF-8 bytes/);
     }
     assert.equal(await User.countDocuments(), 2);
+  });
+
+  it('locks concurrent login failures atomically and restarts counting after expiry', async () => {
+    const account = await register();
+    const User = mongoose.model('User');
+    const fail = () => request('/api/auth/login', { method: 'POST', body: { email: account.email, password: 'WrongPassword123!' }, status: 401 });
+    await Promise.all(Array.from({ length: 5 }, fail));
+    let saved = await User.findById(account.user._id).select('+loginAttempts +lockUntil');
+    assert.equal(saved.loginAttempts, 5);
+    assert.ok(saved.lockUntil > new Date());
+    await request('/api/auth/login', { method: 'POST', body: { email: account.email, password }, status: 429 });
+
+    // An already-fetched document cannot remove a lock acquired in the meantime.
+    assert.equal(await saved.resetLoginAttempts(), null);
+    const lockUntil = saved.lockUntil.getTime();
+    const stillLocked = await saved.incLoginAttempts();
+    assert.equal(stillLocked.loginAttempts, 5);
+    assert.equal(stillLocked.lockUntil.getTime(), lockUntil);
+
+    await User.updateOne({ _id: account.user._id }, { $set: { lockUntil: new Date(Date.now() - 1000) } });
+    const { data } = await fail();
+    assert.match(data.message, /4 attempt\(s\) remaining/);
+    saved = await User.findById(account.user._id).select('+loginAttempts +lockUntil');
+    assert.equal(saved.loginAttempts, 1);
+    assert.ok(!saved.isLocked);
+    await request('/api/auth/login', { method: 'POST', body: { email: account.email, password } });
+    saved = await User.findById(account.user._id).select('+loginAttempts +lockUntil');
+    assert.equal(saved.loginAttempts, 0);
+    assert.ok(!saved.isLocked);
   });
 
   it('rejects Google email conflicts without linking or changing the original local login', async (t) => {

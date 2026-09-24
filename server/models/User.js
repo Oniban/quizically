@@ -99,32 +99,28 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Increment failed login attempts and lock if needed
+// Compute the count and lock together against the current database document.
 userSchema.methods.incLoginAttempts = async function () {
   const LOCK_TIME = 30 * 60 * 1000; // 30 minutes
   const MAX_ATTEMPTS = 5;
-
-  // If lock expired, reset
-  if (this.lockUntil && this.lockUntil < Date.now()) {
-    return this.updateOne({
-      $set: { loginAttempts: 1 },
-      $unset: { lockUntil: 1 },
-    });
-  }
-
-  const updates = { $inc: { loginAttempts: 1 } };
-  if (this.loginAttempts + 1 >= MAX_ATTEMPTS && !this.isLocked) {
-    updates.$set = { lockUntil: Date.now() + LOCK_TIME };
-  }
-  return this.updateOne(updates);
+  const locked = { $gt: [{ $ifNull: ['$lockUntil', new Date(0)] }, '$$NOW'] };
+  const expired = { $and: [{ $ne: [{ $ifNull: ['$lockUntil', null] }, null] }, { $lte: ['$lockUntil', '$$NOW'] }] };
+  return this.constructor.findOneAndUpdate({ _id: this._id }, [
+    { $set: { loginAttempts: { $cond: [locked, '$loginAttempts', { $cond: [expired, 1, { $add: [{ $ifNull: ['$loginAttempts', 0] }, 1] }] }] } } },
+    { $set: { lockUntil: { $cond: [locked, '$lockUntil', { $cond: [{ $gte: ['$loginAttempts', MAX_ATTEMPTS] }, { $add: ['$$NOW', LOCK_TIME] }, '$$REMOVE'] }] } } },
+  ], { returnDocument: 'after', updatePipeline: true }).select('+loginAttempts +lockUntil');
 };
 
 // Reset failed attempts on successful login
 userSchema.methods.resetLoginAttempts = function () {
-  return this.updateOne({
-    $set: { loginAttempts: 0 },
+  // A lock acquired while bcrypt was running must also block a correct password.
+  return this.constructor.findOneAndUpdate({
+    _id: this._id,
+    $or: [{ lockUntil: null }, { lockUntil: { $lte: new Date() } }],
+  }, {
+    $set: { loginAttempts: 0, lastLoginDate: new Date() },
     $unset: { lockUntil: 1 },
-  });
+  }, { returnDocument: 'after' });
 };
 
 const User = mongoose.model('User', userSchema);

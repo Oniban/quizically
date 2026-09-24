@@ -123,8 +123,8 @@ export const login = async (req, res, next) => {
     const isMatch = await user.matchPassword(password);
 
     if (!isMatch) {
-      await user.incLoginAttempts();
-      const attemptsLeft = 5 - (user.loginAttempts + 1);
+      const updated = await user.incLoginAttempts();
+      const attemptsLeft = Math.max(0, 5 - updated.loginAttempts);
       const msg =
         attemptsLeft > 0
           ? `Invalid email or password. ${attemptsLeft} attempt(s) remaining before lockout.`
@@ -133,9 +133,9 @@ export const login = async (req, res, next) => {
     }
 
     // Successful login updates access time, not quiz activity.
-    await user.resetLoginAttempts();
-    user.lastLoginDate = new Date();
-    await user.save();
+    if (!await user.resetLoginAttempts()) {
+      return res.status(429).json({ message: 'Account temporarily locked. Please try again later.' });
+    }
 
     const safeUser = await sanitizeUser(user);
     const token = generateToken(user._id);

@@ -44,6 +44,8 @@ Passwords require at least eight characters, including uppercase, lowercase, and
 
 Existing bcrypt hashes cannot reveal whether an older password exceeded 72 bytes. Such credentials now require an operator-assisted password reset to a compliant password; self-service recovery is still pending. Existing compliant passwords are unchanged.
 
+Five failed password checks lock an account for 30 minutes. Failure counting and lock creation are atomic, including concurrent requests. After expiry, the next failure starts a fresh count; a successful unlocked login clears the count. In-flight requests do not extend an active lock. IP-based request limits apply independently.
+
 The incremental fixes, regression coverage, and compatibility notes are recorded in [the audit fix log](docs/audit-fixes.md).
 
 ## Local Setup
