@@ -1,11 +1,13 @@
 // Protected route component to restrict access to authenticated users
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import Loader from './Loader';
 
+const Login = lazy(() => import('../pages/Auth/Login'));
+
 const ProtectedRoute = () => {
-  const { user, loading, authError, refreshUser } = useAuth();
+  const { user, loading, authError, refreshUser, sessionExpired } = useAuth();
   const [retrying, setRetrying] = useState(false);
   const location = useLocation();
 
@@ -33,7 +35,17 @@ const ProtectedRoute = () => {
     );
   }
 
-  return user ? <Outlet /> : <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />;
+
+  return <>
+    {/* Keep work mounted during reauthentication; a different account starts fresh. */}
+    <div key={user._id} hidden={sessionExpired} inert={sessionExpired || undefined}><Outlet /></div>
+    {sessionExpired && <section aria-label="Session recovery">
+      <h1 className="text-2xl font-bold text-center">Your session has expired</h1>
+      <p className="text-center mt-3">Sign in to continue. Your work is kept on this page for the same account; retry the interrupted action after signing in.</p>
+      <Suspense fallback={<Loader context="session" />}><Login embedded /></Suspense>
+    </section>}
+  </>;
 };
 
 export default ProtectedRoute;

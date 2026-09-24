@@ -8,9 +8,9 @@ import { validatePasswordBytes } from '../../utils/passwordRules';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-const Login = () => {
+const Login = ({ embedded = false }) => {
   const { register, handleSubmit, formState: { errors } } = useForm({ mode: 'onBlur' });
-  const { login, user } = useAuth();
+  const { login, user, sessionExpired } = useAuth();
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -20,8 +20,8 @@ const Login = () => {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) navigate(returnTo, { replace: true });
-  }, [user, navigate, returnTo]);
+    if (user && !sessionExpired && !embedded) navigate(returnTo, { replace: true });
+  }, [user, sessionExpired, embedded, navigate, returnTo]);
 
   // ── Google One Tap / GSI button init ──────────────────────────────────────
   useEffect(() => {

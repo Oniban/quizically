@@ -15,3 +15,11 @@ Each entry is delivered in a focused commit with regression coverage. Use `git l
 - **Change:** a MongoDB update pipeline increments the current count and sets the lock atomically. Active locks are preserved, expired locks restart counting, and a successful password check cannot clear a lock acquired during verification. Error messages use the saved count.
 - **Regression coverage:** five concurrent HTTP failures lock the account; correct passwords are rejected while locked; stale model instances cannot reset or extend the lock; expiry and successful-login reset behave correctly.
 - **Test isolation:** each API test now gets a fresh app/rate-limit store while retaining the isolated database and its indexes.
+
+## 3. Recover expired sessions without discarding in-memory work
+
+- **Finding:** quiz requests displayed a session-expired error, but stale client state redirected the user away from Login.
+- **Change:** quiz API `401` responses mark the session expired. Protected content is hidden and inert while an inline login form allows reauthentication. Same-account login restores the mounted page; a different account remounts it. Failed actions require an explicit retry.
+- **Race handling:** requests carry a session generation, so delayed failures from an old session cannot invalidate a newer login. Network errors and non-authentication HTTP errors do not expire the session.
+- **Regression coverage:** real client service calls with a test HTTP adapter exercise expiry, inline login, draft preservation, account switching, non-authentication errors, and delayed old-session failures.
+- **Scope:** retained work is only in memory on the current page. Reloading or navigating away still discards it; no browser-storage or server-side draft persistence was added.

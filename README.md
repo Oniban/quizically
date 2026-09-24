@@ -46,6 +46,8 @@ Existing bcrypt hashes cannot reveal whether an older password exceeded 72 bytes
 
 Five failed password checks lock an account for 30 minutes. Failure counting and lock creation are atomic, including concurrent requests. After expiry, the next failure starts a fresh count; a successful unlocked login clears the count. In-flight requests do not extend an active lock. IP-based request limits apply independently.
 
+If a quiz API request returns `401`, the current page is hidden and an inline sign-in form appears. Signing back into the same account restores the in-memory quiz draft or answers; retry the failed action explicitly. Signing into a different account starts a fresh page. This is not draft persistence: navigating away or reloading still discards unsaved work. Network failures do not expire the session, and late `401` responses from an earlier session cannot invalidate a new login.
+
 The incremental fixes, regression coverage, and compatibility notes are recorded in [the audit fix log](docs/audit-fixes.md).
 
 ## Local Setup

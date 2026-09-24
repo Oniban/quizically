@@ -1,6 +1,12 @@
 import axios from 'axios';
+import { reportSessionExpired, sessionVersion } from './sessionEvents';
 
 const api = axios.create({ baseURL: '/api/quizzes', withCredentials: true });
+api.interceptors.request.use((config) => ({ ...config, sessionVersion: sessionVersion() }));
+api.interceptors.response.use((response) => response, (error) => {
+  if (error.response?.status === 401) reportSessionExpired(error.config?.sessionVersion);
+  return Promise.reject(error);
+});
 
 export const getQuizzes = async (page = 1, signal) =>
   (await api.get('/', { params: { page }, signal })).data;

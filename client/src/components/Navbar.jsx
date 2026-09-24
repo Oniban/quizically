@@ -18,7 +18,7 @@ const links = [
 ];
 
 const Navbar = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, sessionExpired } = useAuth();
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutPending, setLogoutPending] = useState(false);
@@ -57,7 +57,7 @@ const Navbar = () => {
           <button type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
             {theme === 'light' ? <Moon size={20} aria-hidden="true" /> : <Sun size={20} aria-hidden="true" />}
           </button>
-          {user ? (
+          {user && !sessionExpired ? (
             <>
               <span className="hidden sm:inline-flex"><StreakBadge streak={user.streak} /></span>
               <Link to="/profile" onClick={() => setMenuOpen(false)} aria-label="Your profile" className="flex items-center gap-1 p-2 hover:text-indigo-600 dark:hover:text-indigo-400">
@@ -79,7 +79,7 @@ const Navbar = () => {
           )}
         </div>
 
-        {user && (
+        {user && !sessionExpired && (
           <div id="primary-links" className={`${menuOpen ? 'flex' : 'hidden'} md:flex w-full flex-col md:flex-row md:flex-wrap gap-1 md:gap-x-4 border-t border-gray-100 dark:border-gray-700 pt-3`}>
             {links.map(([to, label]) => (
               <NavLink key={to} to={to} end={to === '/'} onClick={() => setMenuOpen(false)} className={({ isActive }) => `rounded px-2 py-2 text-sm ${isActive ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 font-semibold' : 'hover:text-indigo-600 dark:hover:text-indigo-400'}`}>
