@@ -38,3 +38,9 @@ Each entry is delivered in a focused commit with regression coverage. Use `git l
 - **Regression coverage:** concurrent retries save one quiz and one question set; replay and normalization are stable; changed content conflicts; different authors can use the same key; invalid requests do not reserve keys; legacy keyless quizzes remain valid.
 - **Compatibility:** API consumers must send the header. The partial index needs no legacy backfill. A separate editor commit wires retry-key reuse into the browser flow.
 - **Write failures:** duplicate losers clean up their own unused questions. Uncertain database outcomes retain questions so a possibly committed quiz stays playable; process-interruption orphan cleanup is not a transaction guarantee.
+
+## 6. Reuse publication IDs in the editor
+
+- **Change:** the editor generates one UUID on its first valid publication and sends it through the quiz service as `Idempotency-Key`. Retries and edits retain that ID. A content conflict keeps the draft visible and links to the quiz that already exists.
+- **Regression coverage:** identical retries reuse both payload and key; edits after a lost response retain the key and display the conflict link; a new editor gets a different key; a real Axios test adapter verifies the header on each request.
+- **Scope:** operation IDs last for the mounted editor, including same-account inline reauthentication. Reloading or navigating away starts a new operation and does not recover an unsaved draft.

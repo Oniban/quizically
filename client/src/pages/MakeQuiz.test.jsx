@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +12,8 @@ vi.mock('../services/quizService', async (importOriginal) => ({
 }));
 
 beforeEach(() => createQuiz.mockReset().mockResolvedValue({ _id: 'published-quiz' }));
+
+const uuid = expect.stringMatching(/^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i);
 
 function renderEditor() {
   render(<MemoryRouter initialEntries={['/make-quiz']}><Routes>
@@ -79,7 +81,7 @@ describe('quiz creation', () => {
     expect(createQuiz).toHaveBeenCalledExactlyOnceWith({
       title: 'Capital cities', genre: 'Geography', difficulty: 'Hard', format: 'MCQ',
       questions: [{ questionText: 'Capital of France?', options: ['Paris', 'Rome'], correctAnswer: 'Paris', explanation: 'The French capital.' }],
-    });
+    }, uuid);
   });
 
   it.each([
@@ -98,7 +100,7 @@ describe('quiz creation', () => {
     expect(createQuiz).toHaveBeenCalledExactlyOnceWith({
       title: 'Capital cities', genre: 'Geography', difficulty: 'Medium', format,
       questions: [{ questionText: 'Capital of France?', options, correctAnswer: answer, explanation: '' }],
-    });
+    }, uuid);
   });
 
   it('maintains option bounds and clears an answer when its option is removed', async () => {
@@ -129,6 +131,34 @@ describe('quiz creation', () => {
     expect(await screen.findByRole('heading', { name: 'Published quiz' })).toBeVisible();
     expect(createQuiz).toHaveBeenCalledTimes(2);
     expect(createQuiz.mock.calls[1]).toEqual(createQuiz.mock.calls[0]);
+  });
+
+  it('retains the publication key after a lost response and links to a conflicting saved quiz', async () => {
+    createQuiz.mockRejectedValueOnce(new Error('Response lost'));
+    createQuiz.mockRejectedValueOnce({ response: { status: 409, data: { message: 'This publication already succeeded with different content.', quizId: 'saved-quiz' } } });
+    const user = renderEditor();
+    await fillMcq(user);
+    await user.click(screen.getByRole('button', { name: 'Publish practice quiz' }));
+    await screen.findByRole('alert');
+    await user.type(screen.getByLabelText('Quiz title'), ' Revised');
+    await user.click(screen.getByRole('button', { name: 'Publish practice quiz' }));
+    expect(await screen.findByRole('link', { name: 'Open the already published quiz' })).toHaveAttribute('href', '/quiz/saved-quiz');
+    expect(createQuiz.mock.calls[1][1]).toEqual(createQuiz.mock.calls[0][1]);
+    expect(createQuiz.mock.calls[1][0].title).not.toEqual(createQuiz.mock.calls[0][0].title);
+    expect(screen.getByLabelText('Quiz title')).toHaveValue('  Capital cities   Revised');
+  });
+
+  it('allocates a different publication key for a new editor session', async () => {
+    for (let session = 0; session < 2; session += 1) {
+      const user = renderEditor();
+      await fillMcq(user);
+      await user.click(screen.getByRole('button', { name: 'Publish practice quiz' }));
+      await screen.findByRole('heading', { name: 'Published quiz' });
+      cleanup();
+    }
+    expect(createQuiz.mock.calls[0][1]).toEqual(uuid);
+    expect(createQuiz.mock.calls[1][1]).toEqual(uuid);
+    expect(createQuiz.mock.calls[0][1]).not.toEqual(createQuiz.mock.calls[1][1]);
   });
 
   it('disables editing and duplicate publishing until the request finishes', async () => {

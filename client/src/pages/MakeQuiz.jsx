@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createQuiz, quizError } from '../services/quizService';
 
 const fieldClass = 'w-full min-w-0 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900';
@@ -9,6 +9,7 @@ const MakeQuiz = () => {
   const navigate = useNavigate();
   const nextId = useRef(3);
   const submitting = useRef(false);
+  const publicationKey = useRef(null);
   const [title, setTitle] = useState('');
   const [genre, setGenre] = useState('');
   const [difficulty, setDifficulty] = useState('Medium');
@@ -17,6 +18,7 @@ const MakeQuiz = () => {
     { id: 0, questionText: '', options: [{ id: 1, text: '' }, { id: 2, text: '' }], correctAnswer: '', explanation: '' },
   ]);
   const [error, setError] = useState('');
+  const [publishedQuizId, setPublishedQuizId] = useState('');
   const [saving, setSaving] = useState(false);
 
   const updateQuestion = (id, changes) => {
@@ -33,6 +35,7 @@ const MakeQuiz = () => {
     event.preventDefault();
     if (submitting.current) return;
     setError('');
+    setPublishedQuizId('');
     if (!title.trim() || !genre.trim()) {
       setError('Enter a title and genre that are not just spaces.');
       return;
@@ -56,10 +59,15 @@ const MakeQuiz = () => {
     submitting.current = true;
     setSaving(true);
     try {
-      const quiz = await createQuiz({ title: title.trim(), genre: genre.trim(), difficulty, format, questions: payload });
+      // Keep this operation ID through failures, edits, and inline reauthentication.
+      publicationKey.current ??= crypto.randomUUID();
+      const quiz = await createQuiz({ title: title.trim(), genre: genre.trim(), difficulty, format, questions: payload }, publicationKey.current);
       navigate(`/quiz/${quiz._id}`);
     } catch (requestError) {
       setError(quizError(requestError));
+      if (requestError.response?.status === 409 && typeof requestError.response.data?.quizId === 'string') {
+        setPublishedQuizId(requestError.response.data.quizId);
+      }
     } finally {
       submitting.current = false;
       setSaving(false);
@@ -138,6 +146,7 @@ const MakeQuiz = () => {
           <button type="button" disabled={questions.length >= 30} className={buttonClass} onClick={() => setQuestions([...questions, { id: nextId.current++, questionText: '', options: [{ id: nextId.current++, text: '' }, { id: nextId.current++, text: '' }], correctAnswer: '', explanation: '' }])}>Add question ({questions.length}/30)</button>
         </fieldset>
         {error && <p role="alert" className="text-red-700 dark:text-red-300">{error} Your draft is preserved; correct it or retry publishing.</p>}
+        {publishedQuizId && <Link to={`/quiz/${encodeURIComponent(publishedQuizId)}`} className="block text-indigo-700 dark:text-indigo-300 underline">Open the already published quiz</Link>}
         <button type="submit" disabled={saving} className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-50">{saving ? 'Publishing...' : 'Publish practice quiz'}</button>
         {saving && <p role="status">Saving your quiz...</p>}
       </form>

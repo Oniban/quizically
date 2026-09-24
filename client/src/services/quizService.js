@@ -17,7 +17,8 @@ export const getRecentQuiz = async (signal) =>
 export const getQuiz = async (id, signal) =>
   (await api.get(`/${encodeURIComponent(id)}`, { signal })).data;
 
-export const createQuiz = async (quiz) => (await api.post('/', quiz)).data;
+export const createQuiz = async (quiz, publicationKey) =>
+  (await api.post('/', quiz, { headers: { 'Idempotency-Key': publicationKey } })).data;
 
 export const submitQuiz = async (id, answers) =>
   (await api.post(`/${encodeURIComponent(id)}/submit`, { answers })).data;
