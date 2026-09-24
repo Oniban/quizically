@@ -3,6 +3,7 @@ import express from 'express';
 import { body } from 'express-validator';
 import { register, login, googleAuth, getMe, logout } from '../controllers/authController.js';
 import protect from '../middleware/authMiddleware.js';
+import { fitsPasswordLimit, passwordLimitMessage } from '../services/passwordRules.js';
 
 const router = express.Router();
 
@@ -22,6 +23,8 @@ const registerRules = [
     .normalizeEmail(),
 
   body('password')
+    .isString().withMessage('Password must be a string').bail()
+    .custom(fitsPasswordLimit).withMessage(passwordLimitMessage).bail()
     .notEmpty().withMessage('Password is required')
     .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
     .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
@@ -37,6 +40,8 @@ const loginRules = [
     .normalizeEmail(),
 
   body('password')
+    .isString().withMessage('Password must be a string').bail()
+    .custom(fitsPasswordLimit).withMessage(passwordLimitMessage).bail()
     .notEmpty().withMessage('Password is required'),
 ];
 

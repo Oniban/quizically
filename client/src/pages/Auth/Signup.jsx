@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import { registerUser, googleLogin, safeReturnTo } from '../../services/authService';
+import { validatePasswordBytes } from '../../utils/passwordRules';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -208,6 +209,7 @@ const Signup = () => {
                 required: 'Password is required',
                 minLength: { value: 8, message: 'Password must be at least 8 characters' },
                 validate: {
+                  byteLimit: validatePasswordBytes,
                   hasUpper: (v) => /[A-Z]/.test(v) || 'Must include an uppercase letter',
                   hasLower: (v) => /[a-z]/.test(v) || 'Must include a lowercase letter',
                   hasNumber: (v) => /[0-9]/.test(v) || 'Must include a number',
@@ -230,6 +232,7 @@ const Signup = () => {
             <p role="alert" className="text-red-500 text-xs mt-1">{errors.password.message}</p>
           )}
           <PasswordStrength password={password} />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Maximum 72 UTF-8 bytes. Some characters, including emoji, use multiple bytes.</p>
         </div>
 
         {/* Confirm Password */}

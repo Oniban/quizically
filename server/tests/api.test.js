@@ -255,6 +255,27 @@ describe('quiz API with an isolated MongoDB and real HTTP server', { concurrency
     assert.equal(data.user.totalQuizzes, 0);
   });
 
+  it('enforces the bcrypt byte boundary for registration, login, and direct model writes', async () => {
+    const User = mongoose.model('User');
+    for (const [index, boundary] of [`Aa1${'x'.repeat(69)}`, `Aa1${'é'.repeat(34)}x`].entries()) {
+      assert.equal(Buffer.byteLength(boundary), 72);
+      const email = `boundary${index}@example.com`;
+      await request('/api/auth/register', { method: 'POST', body: { name: 'Boundary Player', email, password: boundary }, status: 201 });
+      await request('/api/auth/login', { method: 'POST', body: { email, password: boundary } });
+      for (const suffix of ['a', 'DIFFERENT']) {
+        const { data, headers } = await request('/api/auth/login', { method: 'POST', body: { email, password: boundary + suffix }, status: 422 });
+        assert.match(data.message, /72 UTF-8 bytes/);
+        assert.equal(headers.get('set-cookie'), null);
+      }
+    }
+    for (const candidate of [`Aa1${'x'.repeat(70)}`, `Aa1${'é'.repeat(35)}`]) {
+      const { data } = await request('/api/auth/register', { method: 'POST', body: { name: 'Long Player', email: 'toolong@example.com', password: candidate }, status: 422 });
+      assert.match(data.message, /72 UTF-8 bytes/);
+      await assert.rejects(User.create({ name: 'Long Player', email: 'direct@example.com', password: candidate }), /72 UTF-8 bytes/);
+    }
+    assert.equal(await User.countDocuments(), 2);
+  });
+
   it('rejects Google email conflicts without linking or changing the original local login', async (t) => {
     const previous = process.env.GOOGLE_CLIENT_ID;
     t.after(() => {

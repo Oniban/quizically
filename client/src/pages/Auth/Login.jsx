@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import { loginUser, googleLogin, safeReturnTo } from '../../services/authService';
+import { validatePasswordBytes } from '../../utils/passwordRules';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -148,7 +149,7 @@ const Login = () => {
               id="password"
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
-              {...register('password', { required: 'Password is required' })}
+              {...register('password', { required: 'Password is required', validate: validatePasswordBytes })}
               className="w-full p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none transition pr-10"
               placeholder="••••••••"
               aria-invalid={errors.password ? 'true' : 'false'}

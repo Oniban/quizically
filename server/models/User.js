@@ -1,6 +1,7 @@
 // User model definition
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { fitsPasswordLimit, passwordLimitMessage } from '../services/passwordRules.js';
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -84,6 +85,9 @@ userSchema.virtual('isLocked').get(function () {
 userSchema.pre('save', async function () {
   // Only hash if password exists and was modified (skips OAuth users)
   if (!this.isModified('password') || !this.password) return;
+  if (!fitsPasswordLimit(this.password)) {
+    throw Object.assign(new Error(passwordLimitMessage), { status: 422 });
+  }
 
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
@@ -91,7 +95,7 @@ userSchema.pre('save', async function () {
 
 // Match entered password to hashed password
 userSchema.methods.matchPassword = async function (enteredPassword) {
-  if (!this.password) return false;
+  if (!this.password || !fitsPasswordLimit(enteredPassword)) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

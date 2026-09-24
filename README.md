@@ -38,6 +38,14 @@ There is **no automatic quiz, attempt, or QM data seeding**. A fresh database st
 - Tests: Node's built-in test runner with `mongodb-memory-server` for API integration tests; Vitest and React Testing Library for client tests.
 - Separate npm projects and lockfiles live in `server/` and `client/`; there is no root npm install step.
 
+## Authentication Rules
+
+Passwords require at least eight characters, including uppercase, lowercase, and a number. Registration and login enforce a maximum of **72 UTF-8 bytes**, matching bcrypt's input limit. Multibyte characters count toward that byte limit; the client and API reject overlong passwords instead of silently truncating them.
+
+Existing bcrypt hashes cannot reveal whether an older password exceeded 72 bytes. Such credentials now require an operator-assisted password reset to a compliant password; self-service recovery is still pending. Existing compliant passwords are unchanged.
+
+The incremental fixes, regression coverage, and compatibility notes are recorded in [the audit fix log](docs/audit-fixes.md).
+
 ## Local Setup
 
 ### Prerequisites
