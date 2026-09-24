@@ -106,7 +106,13 @@ npm run dev --prefix client
 
 Open **http://localhost:3000**. The Vite development server proxies `/api` to `http://localhost:5000`. Keep port 3000 available; Vite fails explicitly if it is occupied instead of silently choosing a port that does not match the allowed origin. Changing the API port also requires updating the development proxy target in `client/vite.config.js`.
 
-The API connects to MongoDB and initializes the attempt uniqueness index before listening. Missing `MONGO_URI` or a `JWT_SECRET` shorter than 32 characters prevents startup.
+The API connects to MongoDB and initializes the attempt and quiz-publication uniqueness indexes before listening. Missing `MONGO_URI` or a `JWT_SECRET` shorter than 32 characters prevents startup.
+
+### Publication API contract
+
+`POST /api/quizzes` requires an `Idempotency-Key` header containing a UUID. Generate it once per publication operation and reuse it for retries. A new publication returns `201 { "_id": "..." }`; the same author, key, and normalized quiz content return `200` with the original ID, including concurrent retries. Reusing the key with different content returns `409` with a `quizId` pointing to the published quiz. Invalid requests do not consume the key. Keys are scoped to the author and retained with the quiz.
+
+The unique index only applies to quizzes with a publication key, so existing quizzes require no backfill. API consumers must supply the new header. Quiz and question writes do not use a transaction: uncertain database failures retain question documents to avoid breaking a quiz that may already have committed. Retrying the same key recovers a saved publication; orphan cleanup after interrupted writes is separate maintenance work.
 
 ## Tests And Build
 

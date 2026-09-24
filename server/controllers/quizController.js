@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { createHash } from 'node:crypto';
 import Quiz from '../models/Quiz.js';
 import Question from '../models/Question.js';
 import Attempt from '../models/Attempt.js';
@@ -22,15 +23,42 @@ export async function listQuizzes(req, res) {
 }
 
 export async function createQuiz(req, res) {
-  const { questions, ...metadata } = validateQuiz(req.body);
+  const key = req.get('Idempotency-Key');
+  if (typeof key !== 'string' || !/^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(key)) {
+    throw invalid('Supply a UUID Idempotency-Key header for quiz publication.', 400);
+  }
+  const validated = validateQuiz(req.body);
+  const publicationHash = createHash('sha256').update(JSON.stringify(validated)).digest('hex');
+  const filter = { createdBy: req.user._id, publicationKey: key.toLowerCase() };
+  const findPublished = () => Quiz.findOne(filter).select('_id questions +publicationHash').lean();
+  const replay = (quiz) => {
+    if (quiz.publicationHash !== publicationHash) {
+      return res.status(409).json({ message: 'This publication already succeeded with different content. Open the published quiz before starting a new one.', quizId: quiz._id });
+    }
+    return res.json({ _id: quiz._id });
+  };
+  const existing = await findPublished();
+  if (existing) return replay(existing);
+
+  const { questions, ...metadata } = validated;
   const documents = questions.map((question) => new Question(question));
   try {
     await Question.insertMany(documents);
-    const quiz = await Quiz.create({ ...metadata, questions: documents.map((question) => question._id), createdBy: req.user._id });
+    const quiz = await Quiz.create({ ...metadata, ...filter, publicationHash, questions: documents.map((question) => question._id) });
     res.status(201).json({ _id: quiz._id });
   } catch (error) {
-    // IDs are allocated before insert so partial failures can also be cleaned up.
-    await Question.deleteMany({ _id: { $in: documents.map((question) => question._id) } }).catch(() => {});
+    if (error.code === 11000) {
+      const winner = await findPublished();
+      if (winner) {
+        // Only discard losing request questions, never those used by a saved quiz.
+        const retained = new Set(winner.questions.map(String));
+        const unused = documents.map((question) => question._id).filter((id) => !retained.has(String(id)));
+        await Question.deleteMany({ _id: { $in: unused } }).catch(() => {});
+        return replay(winner);
+      }
+    }
+    // An unknown write outcome may already have committed the quiz. Keep its
+    // questions intact; a retry with the same key can recover the saved result.
     throw error;
   }
 }

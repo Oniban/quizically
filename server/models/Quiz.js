@@ -2,6 +2,8 @@
 import mongoose from 'mongoose';
 
 const quizSchema = new mongoose.Schema({
+  publicationKey: { type: String, select: false },
+  publicationHash: { type: String, select: false },
   title: {
     type: String,
     required: true,
@@ -40,6 +42,11 @@ const quizSchema = new mongoose.Schema({
 });
 
 quizSchema.index({ createdAt: -1, _id: -1 });
+// Older quizzes have no publication key and remain valid without a migration.
+quizSchema.index({ createdBy: 1, publicationKey: 1 }, {
+  unique: true,
+  partialFilterExpression: { publicationKey: { $type: 'string' } },
+});
 
 const Quiz = mongoose.model('Quiz', quizSchema);
 export default Quiz;

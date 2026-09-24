@@ -30,3 +30,11 @@ Each entry is delivered in a focused commit with regression coverage. Use `git l
 - **Change:** HTTP validation, Google email claims, and the User model use one `validator.isEmail` helper. `validator` is an explicit server dependency. API email values must be strings.
 - **Regression coverage:** registration and login succeed for long TLDs, plus-addressing, and hyphenated domains; malformed addresses fail at both API and model boundaries; the Google account lifecycle test uses a plus-address with a long TLD.
 - **Compatibility:** no stored addresses are rewritten. Existing local provider-specific email normalization, lowercasing, and the prohibition on automatic Google account linking are preserved.
+
+## 5. Deduplicate publication at the database/API boundary
+
+- **Finding:** retrying a publish request after a lost response created another immutable quiz.
+- **Change:** `POST /api/quizzes` requires a UUID `Idempotency-Key`. A unique author/key index and normalized-content hash return the original quiz for identical retries, or a `409` with the original quiz ID for changed content. Startup waits for the index.
+- **Regression coverage:** concurrent retries save one quiz and one question set; replay and normalization are stable; changed content conflicts; different authors can use the same key; invalid requests do not reserve keys; legacy keyless quizzes remain valid.
+- **Compatibility:** API consumers must send the header. The partial index needs no legacy backfill. A separate editor commit wires retry-key reuse into the browser flow.
+- **Write failures:** duplicate losers clean up their own unused questions. Uncertain database outcomes retain questions so a possibly committed quiz stays playable; process-interruption orphan cleanup is not a transaction guarantee.

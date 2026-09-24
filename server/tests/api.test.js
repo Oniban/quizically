@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import mongoose from 'mongoose';
@@ -35,15 +36,15 @@ function quizBody(format = 'MCQ', overrides = {}) {
   return { title: `${format} quiz`, genre: 'Science', difficulty: 'Easy', format, questions: questions[format], ...overrides };
 }
 
-async function request(path, { method = 'GET', cookie, body, status = 200, headers = {}, label = '' } = {}) {
+async function request(path, { method = 'GET', cookie, body, status = 200, headers = {}, label = '', idempotencyKey = randomUUID() } = {}) {
   const response = await fetch(`${baseURL}${path}`, {
     method,
-    headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(cookie ? { Cookie: cookie } : {}), ...headers },
+    headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(cookie ? { Cookie: cookie } : {}), ...(method === 'POST' && path === '/api/quizzes' && idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...headers },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(15000),
   });
   const text = await response.text();
-  assert.equal(response.status, status, `${label} ${method} ${path}: ${text}`);
+  assert.ok([status].flat().includes(response.status), `${label} ${method} ${path}: expected ${status}, got ${response.status}: ${text}`);
   const data = text ? JSON.parse(text) : null;
   if (status >= 400) assert.equal(typeof data.message, 'string');
   return { data, headers: response.headers };
@@ -505,6 +506,45 @@ describe('quiz API with an isolated MongoDB and real HTTP server', { concurrency
     assert.equal(catalog.quizzes.length, 1);
     assert.equal(catalog.quizzes[0]._id, quiz._id);
     assert.equal(catalog.quizzes[0].questionCount, 30);
+  });
+
+  it('deduplicates concurrent publications, detects changed content, and scopes keys to the author', async () => {
+    const author = await register();
+    const other = await register();
+    const idempotencyKey = randomUUID();
+    const body = quizBody();
+    const publish = (overrides = {}) => request('/api/quizzes', { method: 'POST', cookie: author.cookie, body, idempotencyKey, status: [200, 201], ...overrides });
+    const results = await Promise.all(Array.from({ length: 8 }, () => publish()));
+    const saved = results[0].data;
+    for (const { data } of results) assert.deepEqual(data, saved);
+    assert.equal(await mongoose.model('Quiz').countDocuments(), 1);
+    assert.equal(await mongoose.model('Question').countDocuments(), body.questions.length);
+    assert.deepEqual((await publish({ status: 200 })).data, saved);
+    assert.deepEqual((await publish({ body: { ...body, title: ` ${body.title} ` }, status: 200 })).data, saved);
+    const conflict = await publish({ body: { ...body, title: 'Edited after a lost response' }, status: 409 });
+    assert.equal(conflict.data.quizId, saved._id);
+    assert.match(conflict.data.message, /already succeeded/);
+    const independent = await publish({ cookie: other.cookie, status: 201 });
+    assert.notEqual(independent.data._id, saved._id);
+    assert.equal(await mongoose.model('Quiz').countDocuments(), 2);
+    const playable = (await request(`/api/quizzes/${saved._id}`, { cookie: author.cookie })).data;
+    assert.equal(playable.questions.length, body.questions.length);
+    assertNoAnswerKey(playable);
+    assert.equal('publicationKey' in playable, false);
+    assert.equal('publicationHash' in playable, false);
+  });
+
+  it('validates publication keys without reserving invalid requests and supports legacy quizzes', async () => {
+    const { cookie, user } = await register();
+    for (const idempotencyKey of [null, 'not-a-uuid']) {
+      await request('/api/quizzes', { method: 'POST', cookie, body: quizBody(), idempotencyKey, status: 400 });
+    }
+    const idempotencyKey = randomUUID();
+    await request('/api/quizzes', { method: 'POST', cookie, body: quizBody('MCQ', { title: '' }), idempotencyKey, status: 422 });
+    await request('/api/quizzes', { method: 'POST', cookie, body: quizBody(), idempotencyKey, status: 201 });
+    const { questions, ...metadata } = quizBody();
+    await mongoose.model('Quiz').create([{ ...metadata, createdBy: user._id }, { ...metadata, createdBy: user._id }]);
+    assert.equal(await mongoose.model('Quiz').countDocuments(), 3);
   });
 
   it('keeps the auth JSON limit at 10 KiB despite the larger quiz limit', async () => {
