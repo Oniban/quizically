@@ -44,3 +44,25 @@ Each entry is delivered in a focused commit with regression coverage. Use `git l
 - **Change:** the editor generates one UUID on its first valid publication and sends it through the quiz service as `Idempotency-Key`. Retries and edits retain that ID. A content conflict keeps the draft visible and links to the quiz that already exists.
 - **Regression coverage:** identical retries reuse both payload and key; edits after a lost response retain the key and display the conflict link; a new editor gets a different key; a real Axios test adapter verifies the header on each request.
 - **Scope:** operation IDs last for the mounted editor, including same-account inline reauthentication. Reloading or navigating away starts a new operation and does not recover an unsaved draft.
+
+## Verification Snapshot
+
+The complete series through `90f6a8d` was verified with Node **22.23.3**:
+
+| Commit | Change |
+| --- | --- |
+| `d5cb897` | Password UTF-8 byte limit |
+| `716af9d` | Atomic account lockout |
+| `7782086` | Inline expired-session recovery |
+| `46a6644` | Shared email syntax validation |
+| `353b7dc` | Database/API publication idempotency |
+| `90f6a8d` | Editor publication-key reuse |
+
+| Check | Result at this revision |
+| --- | --- |
+| `npm test --prefix server` | 103 passed, including 25 isolated HTTP/MongoDB integration tests |
+| `npm test --prefix client` | 48 passed across 10 files |
+| `npm run build --prefix client` | Passed |
+| `git diff --check 0d502ec..90f6a8d` | Passed |
+
+The npm commands were run under the supported runtime using `npm exec --yes --package=node@22 -c '<command>'`. Tests used temporary MongoDB and mocked client transport/provider boundaries, not the configured application database or real Google sign-in. Browser-level and deployed-host smoke tests remain future work.
