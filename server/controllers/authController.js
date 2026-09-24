@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { validationResult } from 'express-validator';
 import { OAuth2Client } from 'google-auth-library';
 import { getActivityStats } from '../services/quizStats.js';
+import { isValidEmail } from '../services/emailRules.js';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -180,7 +181,7 @@ export const googleAuth = async (req, res, next) => {
 
     const { sub: googleId, email, email_verified, name, picture } = payload || {};
 
-    if (!googleId || !email || email_verified !== true) {
+    if (!googleId || !isValidEmail(email) || email_verified !== true) {
       return res.status(401).json({ message: 'Google account must have a verified email' });
     }
 

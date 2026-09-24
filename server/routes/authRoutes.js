@@ -4,6 +4,7 @@ import { body } from 'express-validator';
 import { register, login, googleAuth, getMe, logout } from '../controllers/authController.js';
 import protect from '../middleware/authMiddleware.js';
 import { fitsPasswordLimit, passwordLimitMessage } from '../services/passwordRules.js';
+import { isValidEmail } from '../services/emailRules.js';
 
 const router = express.Router();
 
@@ -17,9 +18,10 @@ const registerRules = [
     .matches(/^[a-zA-Z\s'-]+$/).withMessage('Name can only contain letters, spaces, hyphens and apostrophes'),
 
   body('email')
+    .isString().withMessage('Email must be a string').bail()
     .trim()
     .notEmpty().withMessage('Email is required')
-    .isEmail().withMessage('Please enter a valid email address')
+    .custom(isValidEmail).withMessage('Please enter a valid email address')
     .normalizeEmail(),
 
   body('password')
@@ -34,9 +36,10 @@ const registerRules = [
 
 const loginRules = [
   body('email')
+    .isString().withMessage('Email must be a string').bail()
     .trim()
     .notEmpty().withMessage('Email is required')
-    .isEmail().withMessage('Please enter a valid email address')
+    .custom(isValidEmail).withMessage('Please enter a valid email address')
     .normalizeEmail(),
 
   body('password')

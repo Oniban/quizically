@@ -23,3 +23,10 @@ Each entry is delivered in a focused commit with regression coverage. Use `git l
 - **Race handling:** requests carry a session generation, so delayed failures from an old session cannot invalidate a newer login. Network errors and non-authentication HTTP errors do not expire the session.
 - **Regression coverage:** real client service calls with a test HTTP adapter exercise expiry, inline login, draft preservation, account switching, non-authentication errors, and delayed old-session failures.
 - **Scope:** retained work is only in memory on the current page. Reloading or navigating away still discards it; no browser-storage or server-side draft persistence was added.
+
+## 4. Accept valid email addresses consistently
+
+- **Finding:** the User model's older regex rejected valid addresses accepted by the API, including plus-addressing and long top-level domains.
+- **Change:** HTTP validation, Google email claims, and the User model use one `validator.isEmail` helper. `validator` is an explicit server dependency. API email values must be strings.
+- **Regression coverage:** registration and login succeed for long TLDs, plus-addressing, and hyphenated domains; malformed addresses fail at both API and model boundaries; the Google account lifecycle test uses a plus-address with a long TLD.
+- **Compatibility:** no stored addresses are rewritten. Existing local provider-specific email normalization, lowercasing, and the prohibition on automatic Google account linking are preserved.

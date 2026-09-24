@@ -311,6 +311,21 @@ describe('quiz API with an isolated MongoDB and real HTTP server', { concurrency
     assert.ok(!saved.isLocked);
   });
 
+  it('accepts valid email syntax consistently and still rejects malformed addresses', async () => {
+    const User = mongoose.model('User');
+    for (const email of ['player@example.technology', 'player+quiz@example.com', 'player@quiz-club.com']) {
+      const { data } = await request('/api/auth/register', { method: 'POST', body: { name: 'Email Player', email: `  ${email.toUpperCase()}  `, password }, status: 201 });
+      assert.equal(data.user.email, email);
+      const login = await request('/api/auth/login', { method: 'POST', body: { email: email.toUpperCase(), password } });
+      assert.equal(login.data.user._id, data.user._id);
+    }
+    for (const email of ['missing-at.example.com', 'player@', 'player@example..com', 'player name@example.com']) {
+      await request('/api/auth/register', { method: 'POST', body: { name: 'Email Player', email, password }, status: 422 });
+      await assert.rejects(new User({ name: 'Email Player', email, password }).validate(), /valid email/);
+    }
+    assert.equal(await User.countDocuments(), 3);
+  });
+
   it('rejects Google email conflicts without linking or changing the original local login', async (t) => {
     const previous = process.env.GOOGLE_CLIENT_ID;
     t.after(() => {
@@ -353,7 +368,7 @@ describe('quiz API with an isolated MongoDB and real HTTP server', { concurrency
       else process.env.GOOGLE_CLIENT_ID = previous;
     });
     process.env.GOOGLE_CLIENT_ID = 'test-only-google-client';
-    const payload = { sub: 'new-google-identity', email: 'googleplayer@example.com', email_verified: true, name: 'Google Player' };
+    const payload = { sub: 'new-google-identity', email: 'googleplayer+quiz@example.technology', email_verified: true, name: 'Google Player' };
     const verify = t.mock.method(OAuth2Client.prototype, 'verifyIdToken', async () => ({ getPayload: () => payload }));
     let userId;
     for (let i = 0; i < 2; i += 1) {

@@ -40,6 +40,8 @@ There is **no automatic quiz, attempt, or QM data seeding**. A fresh database st
 
 ## Authentication Rules
 
+Registration, login, Google email claims, and the User model share the same email syntax validator, including support for plus-addressing and long top-level domains. Existing email normalization and account-linking rules still apply.
+
 Passwords require at least eight characters, including uppercase, lowercase, and a number. Registration and login enforce a maximum of **72 UTF-8 bytes**, matching bcrypt's input limit. Multibyte characters count toward that byte limit; the client and API reject overlong passwords instead of silently truncating them.
 
 Existing bcrypt hashes cannot reveal whether an older password exceeded 72 bytes. Such credentials now require an operator-assisted password reset to a compliant password; self-service recovery is still pending. Existing compliant passwords are unchanged.

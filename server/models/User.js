@@ -2,6 +2,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { fitsPasswordLimit, passwordLimitMessage } from '../services/passwordRules.js';
+import { isValidEmail } from '../services/emailRules.js';
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -16,10 +17,7 @@ const userSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
     trim: true,
-    match: [
-      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-      'Please add a valid email',
-    ],
+    validate: { validator: isValidEmail, message: 'Please add a valid email' },
   },
   password: {
     type: String,
